@@ -1,6 +1,7 @@
 # PythonSupportPrograms
 Various mini-apps I've created to make my life easier
 # GeneralDataLog
+This app tracks various bits of personal data (hours I sleep, money spent on commutes, projects I'm working on, etc.)
 # ToDoMgr
 # guiBlocks
 # autoVersion
