@@ -1,6 +1,9 @@
+# Last Run 11/23/17
+# Last Edited 11/23/17
 import sqlite3
 import os.path
 import datetime as dt2
+import re
 
 
 from guiBlocks import *
@@ -9,9 +12,51 @@ vcdb = "VersionControl.db"
 cvdb = "CurrentVersion.db"
 
 def dispRunDateTime():
+    """Displays the surrent date and time in the Python shell"""
     print(curDateTime())
     
+def stampFile(filename):
+    """Adds or edits a comment line at the beginning of filename with the 
+    current date to indicate the last time the file was edited."
+    """
+        
+    with open(filename,'r') as curFile:
+        fileLines = curFile.readlines()
+        
+    curLine = 0
+    stampLine = -1
+    while fileLines[curLine].find("import")<0:
+        if re.match("# Last Edited",fileLines[curLine])!=None:
+            stampLine = curLine 
+        curLine+=1
+    
+    stampStr = dt2.datetime.now().strftime("# Last Edited" + " %m/%d/%y\n")
+    if stampLine == -1:
+        stampLine=0
+        fileLines = [stampStr]+fileLines
+    else:
+        fileLines[stampLine] = stampStr
+        
+        
+    with open(filename,'w') as curFile:
+        curFile.write("".join(fileLines))
+        
+        
+    
 class editLog():
+    """This is a class used to help keep track of edits to the projects.  It 
+    connects to a VersionControl database and a CurrentVersion database.  
+    VersionControl keeps a record of all changes to the code, for as long as 
+    it's been tracked.
+    CurrentVersion only keeps the most recent version.
+    Member Functions:
+        __init__: Really just connects to the databases
+        autoversionFile checks and logs a single file
+        compareHash checks the database-stored version of the file with t he current version, based on the MD5 hash of each
+        storeFileFn saves the file to both databases if a change is detected
+        autoversionList iterates through a list of files, calling 
+            autoversionFile on each.
+        """
     def __init__(self):
         if os.path.isfile(vcdb):
             print("Version Control Found")
@@ -27,14 +72,33 @@ class editLog():
             print("Something's wrong; cannot find Current Version database")
             return
         
-    def autoversionFile(self,storeFile,commit = True):
-        newFile = self.compareHash(storeFile)
+    def compareHash(self,storeFile):
+        """Determines whether or not storeFile needs to be stored in the database.
+        (Returns True if so; False if not)"""
+    
+        # Need to compute the hash for storeFile regardless.
+        self.newHash = getFileHash(storeFile)
         
-        if newFile:
-            print("Storing data")
-            self.storeFileFn(storeFile,commit)
-            
+        # See if the file already exists in the database.  If not, return True
+        foundFile = self.vcConn.execute("SELECT count(RevisionID) FROM FileRevisions WHERE Filename = ?",[storeFile]).fetchone()[0]
+        print(f"Found {foundFile} copies")
+        if foundFile == 0:
+            print(f"{storeFile} not stored yet")
+            return True
+        
+        # If the file exists, compare the new hash against the stored hash; 
+        #   if they match, return False (file doesn't need to be stored")
+        foundHash = self.vcConn.execute("SELECT count(RevisionID) FROM FileRevisions WHERE FileHash = ?",[self.newHash]).fetchone()[0]
+        if foundHash > 0:
+            print(f"{storeFile} has not been changed")
+            return False
+        
+        # If they're different, return true
+        print(f"{storeFile} has been changed")
+        return True
+
     def storeFileFn(self,fileName,commit):
+        stampFile(fileName)
         stamp = dt2.datetime.now().timestamp()
         with open(fileName,'rb') as wkFile:
             wkBytes = wkFile.read()
@@ -45,6 +109,14 @@ class editLog():
         if commit:
             self.vcConn.commit()
             self.cvConn.commit()
+
+    def autoversionFile(self,storeFile,commit = True):
+        newFile = self.compareHash(storeFile)
+        
+        if newFile:
+            print("Storing data")
+            self.storeFileFn(storeFile,commit)
+            
     
     def autoversionList(self,fileList):
         for ln in fileList:
@@ -56,26 +128,6 @@ class editLog():
         self.vcConn.close()
         self.cvConn.close()
         
-        
-    def compareHash(self,storeFile):
-    # Confirm that the file is already in the database; if not, return the bytes for the file
-    # If the file has already been stored, calculate the hash, and look for it in the database
-    # If the hash is present -- the file hasn't been changed; return None
-    # If the hash isn't in the DB, return the bytes for the file
-        self.newHash = getFileHash(storeFile)
-        
-        foundFile = self.vcConn.execute("SELECT RevisionID FROM FileRevisions WHERE Filename = ?",[storeFile]).fetchone()
-        if foundFile == None:
-            print(f"{storeFile} not stored yet")
-            return True
-
-        foundHash = self.vcConn.execute("SELECT RevisionID FROM FileRevisions WHERE Filehash = ?",[self.newHash]).fetchone()
-        if foundHash == None:
-            print(f"{storeFile} has not been changed")
-            return False
-        
-        print(f"{storeFile} has been changed; storing")
-        return True
 
 def autoversionFile(storeFile,vcConn=None, cvConn = None):
     if vcConn == None:
