@@ -1,3 +1,4 @@
+# Last Edited 11/27/17
 import tkinter as tk
 from tkinter import ttk
 import tkinter.messagebox as tkmb
@@ -21,8 +22,8 @@ import autoversion as av
 
 av.dispRunDateTime()
 #av.autoversionList(("autoversion.py","guiBlocks.py","symposiumDlgs.py","symposiumMgmt.pyw","paperAbstractSymposiumDlg.py"))
-log = av.editLog()
-log.autoversionList(("autoversion.py","guiBlocks.py","symposiumDlgs.py","symposiumMgmt.pyw","paperAbstractSymposiumDlg.py"))
+el = av.editLog()
+el.autoversionList(("autoversion.py","guiBlocks.py","symposiumDlgs.py","symposiumMgmt.pyw","paperAbstractSymposiumDlg.py"))
 
 # Need new tab for draft paper assignment
 #   * Should pull from Assign Abstracts pretty heavily
@@ -503,33 +504,35 @@ tabFrame.grid(row=0,column=0)
 tabs = ttk.Notebook(tabFrame)
 tabs.grid(sticky=tk.NSEW)
 
-addPerson = personDlg(tabs,conn)
+#addPerson = personDlg(tabs,conn)
 addPaperAbstract = paperAbstractDlg(tabs,conn)
-addPaper = paperDlg(tabs,conn)
-addAbstract = abstractDlg(tabs,conn)
-buildCommittee = buildCommitteeDlg(tabs,conn)
-assignAbstracts = assignCommitteeDlg(tabs,conn)
-mergeReviews = aggregateReviewResultsDlg(tabs,conn)
-addKeywords = kwDlg(tabs,conn)
-handleDrafts = manageDraftsDlg(tabs,conn)
-handleFinals = manageFinalDlg(tabs,conn)
-handleTracks = manageTracksDlg(tabs,conn)
+#addPaper = paperDlg(tabs,conn)
+#addAbstract = abstractDlg(tabs,conn)
+#buildCommittee = buildCommitteeDlg(tabs,conn)
+#assignAbstracts = assignCommitteeDlg(tabs,conn)
+#mergeReviews = aggregateReviewResultsDlg(tabs,conn)
+#addKeywords = kwDlg(tabs,conn)
+#handleDrafts = manageDraftsDlg(tabs,conn)
+#handleFinals = manageFinalDlg(tabs,conn)
+#handleTracks = manageTracksDlg(tabs,conn)
+
+#addPaperAbstract.attachPersonDlg(addPerson)
 
 
-tabs.add(addPerson,text="Person")
-tabs.add(addPaper,text="Papers")
+#tabs.add(addPerson,text="Person")
+#tabs.add(addPaper,text="Papers")
 tabs.add(addPaperAbstract,text = "Paper/Abstract")
-tabs.add(addAbstract,text="Abstract")
-tabs.add(buildCommittee,text="Assemble Committee")
-tabs.add(assignAbstracts,text="Assign Abstracts")
-tabs.add(mergeReviews,text="Merge Reviews")
-tabs.add(addKeywords,text="Keywords")
-tabs.add(handleDrafts,text="Manage Drafts")
-tabs.add(handleFinals,text="Manage Finals")
-tabs.add(handleTracks,text="Manage Tracks")
-tabs.enable_traversal()
-
-tabs.bind("<<NotebookTabChanged>>",tabChange)
+#tabs.add(addAbstract,text="Abstract")
+#tabs.add(buildCommittee,text="Assemble Committee")
+#tabs.add(assignAbstracts,text="Assign Abstracts")
+#tabs.add(mergeReviews,text="Merge Reviews")
+#tabs.add(addKeywords,text="Keywords")
+#tabs.add(handleDrafts,text="Manage Drafts")
+#tabs.add(handleFinals,text="Manage Finals")
+#tabs.add(handleTracks,text="Manage Tracks")
+#tabs.enable_traversal()
+#
+#tabs.bind("<<NotebookTabChanged>>",tabChange)
 
 exitBtn = actionBtn(win,"Exit",exitFn,3)
 

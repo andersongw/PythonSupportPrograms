@@ -1,3 +1,5 @@
+# Last Edited 11/27/17
+     # Last Edited 11/27/17
 import tkinter as tk
 from tkinter import ttk
 import tkinter.messagebox as tkmb
@@ -157,6 +159,9 @@ class personDlg(tk.Frame):
             self.titleList.append(self.title.getVal())
             self.titleList.sort()
             self.title.updateVals(self.titleList)
+            
+    def decomposeName(self,txt):
+        resName = None
         
     def parseName(self,event=None):
         """Break a name down into its component parts, including the phone 
@@ -228,7 +233,7 @@ class personDlg(tk.Frame):
         self.affiliation.setVal("")
         self.fullName.setVal("")
 
-    def saveData(self):
+    def saveData(self,event=None):
         """Write the data in the controls to the database"""
         self.checkTitle()
         self.checkAffiliation()

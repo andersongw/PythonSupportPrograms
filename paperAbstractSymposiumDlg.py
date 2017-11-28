@@ -1,3 +1,4 @@
+# Last Edited 11/27/17
 # -*- coding: utf-8 -*-
 """
 Created on Tue Nov 14 13:55:27 2017
@@ -17,7 +18,7 @@ import collections
 import openpyxl as xl
 
 
-
+from symposiumDlgs import *
 from guiBlocks import *
 """
 Some useful links for the Outlook COM model:
@@ -30,6 +31,7 @@ for openpyxl:
 rePerson = re.compile(r"(?P<person>.*) (CIV|CTR) .*, (?P<code>[0-9]*)")
 reName = re.compile(r"(?P<last>.*), (?P<first>\S*) ?(?P<mi>\S)?")
 reEmail = re.compile(r".*RECIPIENTS/CN=(?P<email>\D*\d*)")
+reName2 = re.compile(r"(?P<title>Dr\.|Mr?s?\.)?\s?(?P<first>\w+)\s?(?P<middle>\w+\.?)?\s(?P<last>\w+)")
 
 messageData = collections.namedtuple("messageData","date name email code attach, body")
 nullMsg = messageData(None,None,None,None,[],None)
@@ -88,7 +90,6 @@ class excelLink():
         wkSheet = self.wkBook.get_active_sheet()
         rows = wkSheet.rows
         rowList = [self.parseExcelRow(ln) for ln in rows]
-        print(len(rowList))
         return rowList
         
     def parseExcelRow(self,wkRow):
@@ -230,6 +231,7 @@ class outlookLink():
 class paperAbstractDlg(tk.Frame):
     def __init__(self,master,dbConn):
         tk.Frame.__init__(self,master)
+        self.myMaster = master
         
         excelBase = "email export.xlsx"
         
@@ -238,15 +240,19 @@ class paperAbstractDlg(tk.Frame):
         
         self.docDir = os.path.join(os.environ["USERPROFILE"],"documents")
         
-        leftFrame = formFrame(self,"Paper Data",0,0)
+        topFrame = formFrame(self,"Person",0,0,2)
+        self.personDlg = personDlg(topFrame.frame,self.dbConn)
+        
+        leftFrame = formFrame(self,"Paper Data",1,0)
         leftControls = leftFrame.frame
                
-        symRow, titleRow, origNameRow, newNameRow, primRow, corRow, coRow, addCoRow, saveClrRow, bodyRow = range(10)
+        symRow, titleRow, origNameRow, newNameRow, primRow, corRow, coRow, addCoRow, saveClrRow, acceptRow, bodyRow = range(11)
 
         self.symBox = dataComboBox(leftControls, "Symposium",[],symRow)
         self.titleBox = dataFieldLeft(leftControls,"Paper Title",titleRow)
         self.origFilenameBox = dataComboBox(leftControls,"Original Filename",["test1","test2"],origNameRow)
-        self.dateRec = dataFieldLeft(leftControls,"Date Received",origNameRow,1)
+        self.loadBtn = actionBtn(leftControls,"Open Attachment",self.loadAttach,origNameRow,1)
+        self.dateRec = dataFieldLeft(leftControls,"Date Received",titleRow,1)
         self.newFilenameBox = dataFieldLeft(leftControls,"New Filename",newNameRow)
         self.primaryAuthorBox = dataComboBox(leftControls,"Primary Author",["Test1","Test2"],primRow)
         self.corrAuthorBox = dataComboBox(leftControls,"Corresponding Author",["Test1","Test2"],corRow)
@@ -257,9 +263,17 @@ class paperAbstractDlg(tk.Frame):
         self.authorsBox = messageListbox(leftControls,primRow,1)
         self.saveClearBtn = dblBtn(leftControls,["Save Data","Clear Data"],[self.saveData,self.clearData],saveClrRow)
         
+        self.acceptBox = dataCheckBox(leftControls,"Accept Abstract?",True,acceptRow,0)
+        
         self.bodyBox = dataTextBox(leftControls,"Message Body",bodyRow,0,2,boxH=5)
         
-        rightFrame = formFrame(self,"Email Data",0,1)
+        self.primaryAuthorBox.bindField("<FocusIn>",self.popAuthors)
+        self.primaryAuthorBox.bindField("<FocusOut>",self.addPrimeAuthorFn)
+        self.authorsBox.bindField("<<TreeviewSelect>>",self.delCoAuthorFn)
+        
+        
+        
+        rightFrame = formFrame(self,"Email Data",1,1)
         rightControls = rightFrame.frame
         
         pstRow, fldrRow, xlRow,countRow, treeRow = range(5)
@@ -289,24 +303,24 @@ class paperAbstractDlg(tk.Frame):
         self.outlook = outlookLink()
         self.popSym()
         self.popAuthors()
+        self.addPrimeAuthorFn()
         
     def popSym(self):
         res=self.dbConn.execute("SELECT SymposiumID, Name FROM Symposia ORDER BY EndDate DESC").fetchall()
         self.sym_id={ln["Name"]:ln["SymposiumID"] for ln in res}
         self.symBox.updateVals(list(self.sym_id.keys()))
         
-    def popAuthors(self):
+    def popAuthors(self,event=None):
+        print("Should be updated")
         res = self.dbConn.execute("SELECT * FROM People WHERE PersonID>0 ORDER BY LastName").fetchall()
-        self.authList = [f"{ln['Title']} {ln['Firstname']} {ln['Lastname']}" for ln in res]
+        print(len(res))
+        self.authList = [f"{ln['Firstname']} {ln['Lastname']}" for ln in res]
         ids = [ln["PersonID"] for ln in res]
         self.name_id = dict(zip(self.authList,ids))
         self.primaryAuthorBox.updateVals(self.authList)
         self.coAuthorBox.updateVals(self.authList)
         self.corrAuthorBox.updateVals(self.authList)
         
-    def addCoauthFn(self,event=None):
-        pass
-    
     def saveData(self,event=None):
         pass
     
@@ -320,6 +334,7 @@ class paperAbstractDlg(tk.Frame):
             self.xlFileBox.setVal(newFile)
             self.excel = excelLink(newFile)
         self.iid_attachlist={}
+        self.iid_message={}
         msgList = self.excel.readExcelExport()
         for msg in msgList:
             try:
@@ -327,11 +342,21 @@ class paperAbstractDlg(tk.Frame):
                 addLine = [msg.attach,
                            printDate,
                            msg.name,msg.body]
-            except:
-                print("shit.")
+            except Exception as e:
+                print("Shit.  Some kind of problem with the line in Excel")
+                print(e)
+                print(msg)
                 continue
             newIID = self.emailView.addLine("","",addLine)
             self.iid_attachlist[newIID]=msg.attach
+            self.iid_message[newIID]=msg
+        curSymID = self.sym_id[self.symBox.getVal()]
+        # Look for any of the files in attachList in the AbstractFiles database
+        # If there, then the abstract has been processed; get the information 
+        # from the Abstract and Paper tables at that point
+        for attach in msg.attach:
+            res = self.dbConn.execute("SELECT PaperID FROM AbstractFiles WHERE OriginalFilename = ?",[attach]).fetchall()
+            
             
         
     
@@ -355,7 +380,9 @@ class paperAbstractDlg(tk.Frame):
         
         
     def readFolderFn(self,event=None):
+        """Read the emails from Outlook (non-functional on NMCI)"""
         self.iid_attachlist={}
+        self.iid_author={}
         msgList = self.outlook.fetchMessages(self.folderBox.getVal())
         for msg in msgList:
             msgData = self.outlook.getMsgInfo(msg)
@@ -373,12 +400,63 @@ class paperAbstractDlg(tk.Frame):
             
 
     def selectEmailFn(self,event=None):
+        """Populate the paper information from the selected email"""
         selIID = self.emailView.getSelection()[0]
+        curMsg = self.iid_message[selIID]
         emailData = self.emailView.getValues(selIID)
         attachList = self.iid_attachlist[selIID]
         self.origFilenameBox.updateVals(attachList)
         self.dateRec.setVal(emailData[1])
         self.bodyBox.setVal(emailData[3])
+        wkName = emailData[2]
+        res = reName2.search(wkName)
+        if res !=None:
+            first,last = res.group('first'),res.group('last')
+            personFind = self.dbConn.execute("SELECT * FROM People WHERE Firstname = ? AND Lastname = ?",(first,last)).fetchall()
+            if len(personFind)==0:
+                self.personDlg.fullName.setVal(wkName)
+                self.personDlg.email.setVal(curMsg.email)
+                if curMsg.code != None:
+                    curAffil = f"NSWCPD, Code {curMsg.code}"
+                else:
+                    curAffil = ""
+                pyperclip.copy(curAffil)
+                self.personDlg.affiliation.setVal(curAffil)
+                self.personDlg.phone.setVal("")
+
+    def loadAttach(self,event=None):
+        """Open the file listed in the combo box"""
+        try:
+            os.startfile(self.origFilenameBox.getVal())
+        except FileNotFoundError:
+            newDir = os.path.split(tkfd.askopenfilename())
+            os.chdir(newDir[0])
+            os.startfile(self.origFilenameBox.getVal())
         
     
-    
+    def createEmail(self):
+        """Create the acceptance/rejection notification email"""
+        accept = self.acceptBox.getVal()
+        acceptBody = f"""Dear {title} {Lastname},
+        
+        Thank you for submitting your abstract, {paperTitle} for consideration for the 2018 Advanced Machinery Technology Symposium."""
+        
+        rejectBody = f"""Dear {title} {Lastname},
+        
+        Thank you for submitting your abstract, {paperTitle} for consideration for the 2018 Advanced Machinery Technology Symposium."""
+        
+    def addPrimeAuthorFn(self,event=None):
+        curAuthor = self.primaryAuthorBox.getVal()
+        self.authorsBox.dropLine(0)
+        self.authorsBox.insertLine(0,curAuthor)
+        
+    def addCoauthorFn(self,event=None):
+        curAuthor = self.coAuthorBox.getVal()
+        self.authorsBox.addLine(curAuthor)
+
+    def delCoAuthorFn(self,event=None):
+        curIndex = self.authorBox.getSelectionIndex()
+        if curIndex == (0,):
+            tkmb.showerror(None,"Cannot delete primary author")
+        else:
+            self.authorBox.dropLine(curIndex)

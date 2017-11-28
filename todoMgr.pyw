@@ -1,3 +1,4 @@
+# Last Edited 11/24/17
 import tkinter as tk
 from tkinter import ttk
 from tkinter import messagebox as tkmb
@@ -18,7 +19,7 @@ from taskViewers import *
 from noteDlg import *
 import autoversion as av
 
-#execExts=(".py",".pyw",".exe")
+execExts=(".py",".pyw",".exe")
 
 av.dispRunDateTime()
 el=av.editLog()
