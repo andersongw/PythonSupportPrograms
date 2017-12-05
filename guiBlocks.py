@@ -1,4 +1,4 @@
-# Last Edited 11/27/17
+# Last Edited 12/05/17
 import tkinter as tk
 from tkinter import ttk
 import tkinter.simpledialog as tksd
@@ -11,6 +11,7 @@ import re
 import datetime as dt
 import calendar as cal
 import hashlib
+import fnmatch
 
 
 import pyperclip
@@ -132,6 +133,9 @@ def locateFile(fileName,fileHash = None, testDirs = None, findFirst = True):
     if foundFile:
         return foundList
     return None
+
+def findByHash(fileName,fileHash,testDirs = None,findFirst=True):
+    pass
                 
 
 def getFileData(fname):

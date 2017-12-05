@@ -1,3 +1,4 @@
+# Last Edited 12/05/17
 import tkinter as tk
 from tkinter import ttk
 from tkinter import messagebox as tkmb
@@ -45,7 +46,8 @@ def getProjects(conn,flag = None,complete = None, archive = None):
         sqlParam.append(complete)
     if archive != None:
         sqlStr+=" AND Archive = ?"
-        sqlParam.append(archive)        
+        sqlParam.append(archive)      
+    sqlStr += " ORDER BY Priority"
     return conn.execute(sqlStr,sqlParam).fetchall()
     
 def pushFlag(event=None):
