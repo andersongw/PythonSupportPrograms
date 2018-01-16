@@ -6,9 +6,9 @@ import subprocess
 import win32com.client as w32
 import os.path
 
-##import tkinter.messagebox as tkmb
+import tkinter.messagebox as tkmb
 ##
-##tkmb.showinfo(message="Ran")
+tkmb.showinfo(message="Ran")
 
 timeDir = r'C:\Users\gregory.w.anderson\Documents\Timekeeping'
 
