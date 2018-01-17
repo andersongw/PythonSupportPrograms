@@ -294,7 +294,9 @@ def cleanDate(dateTxt):
     return str.format("{:02d}/{:02d}/{:02d}",int(res["mn"]),int(res["dy"]),int(res.get("yr",str(dt.date.today().year))[-2:]))
 
 def nextDay(dayStr):
-    """Returns the date for the day following the supplied date"""
+    """Returns the date for the day following the supplied date.
+    (possibly obselete.)"""
+    print("Someone called nextDay; update to use stepDate if applicable")
     dayFormat = "%m/%d/%y"
     try:
         origDate = dt.datetime.strptime(cleanDate(dayStr),dayFormat)
@@ -305,13 +307,15 @@ def nextDay(dayStr):
     return (origDate + dt.timedelta(1)).strftime(dayFormat)
 
 def isValidDate(workDate):
-    """Returns True if the supplied date is formatted in a way the application identifies as a date."""
+    """Returns True if the supplied date is formatted in a way the application identifies as a date.
+    (Given shift to datetime objects and exceptions; this is probably obsolete."""
+    print("Someone called isValidDate; refactor code.")
     return stdDateRegex.match(cleanDate(workDate))!=None
 
 def sortableDate(workDate):
     """Returns a date formatted as YYYY-MM-DD, which allows the data to be sorted by date.
     (As of Jan 2018, moving to using a Posix timestamp to store dates, so this is obsolete)"""
-    print("Call to sortable Date; need to update code")
+    print("Call to sortable Date; need to refactor code")
     try:
         parseDate = stdDateRegex.match(workDate).groupdict()
     except AttributeError:
@@ -322,7 +326,7 @@ def sortableDate(workDate):
 def sortableTimestamp(workStamp):
     """Reformats a mm/dd/yy hh:mm:ss time stamp (recorded in database) to a sortable format (
     """
-    print("Called sortableTimestamp; need to rewrite code")
+    print("Called sortableTimestamp; need to refactor code")
     sortedStamp = dt.datetime.strptime(workStamp,"%m/%d/%y %H:%M:%S")
     return sortedStamp.strftime("%y/%m/%d %H:%M:%S")
 
@@ -1144,10 +1148,11 @@ class dateFieldLeft(dataFieldLeft):
         self.field.focus_set()
             
 
-    def stepDate(self,event):
+    def stepDate(self,event=None):
         """Handler called when the scroll wheel is used to increment/decrement
         the date.  Holding Ctrl when scrolling adjusts the date by a month
-        rather than a day."""
+        rather than a day.  If called with no argument (event=None), 
+        increment the date by one day."""
         try:
             origDate = dt.datetime.strptime(cleanDate(self.data.get()),"%m/%d/%y")
 
@@ -1155,15 +1160,18 @@ class dateFieldLeft(dataFieldLeft):
             self.data.set(curDate())
             return 
 
-        if event.delta>0:
-            step = -1
-        else:
-            step = 1
-
-        if event.state & 0x004 == 4:
-            newDate = monthDelta(origDate,step)
-        else:
-            newDate = origDate+dt.timedelta(step)
+        try:
+            if event.delta>0:
+                step = -1
+            else:
+                step = 1
+    
+            if event.state & 0x004 == 4:
+                newDate = monthDelta(origDate,step)
+            else:
+                newDate = origDate+dt.timedelta(step)
+        except:
+            newDate = origDate + dt.timedelta(1)
 
         self.data.set(newDate.strftime(self.autoFormatStr))
         self.curDatetime = newDate

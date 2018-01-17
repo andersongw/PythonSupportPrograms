@@ -1,4 +1,4 @@
-# Last Edited 11/23/17
+# Last Edited 01/16/18
 import tkinter as tk
 from tkinter import ttk
 import tkinter.messagebox as tkmb
@@ -115,10 +115,10 @@ class sleepFrame(tk.Frame):
     def pickMissingDate(self,event=None):
         try:
             curLine = self.missingDaysList.getSelection()
-            self.date.setVal(curLine)
+            self.date.setDateText(curLine)
             self.target.takeFocus()
         except:
-            print("exception")
+            print("exception pickMissingDate (121)")
             
     def jumpTab(self):
         print(self.tabs.select(1))
@@ -145,7 +145,7 @@ class sleepFrame(tk.Frame):
                 self.lyric.getVal())
 
     def setData(self,newData):
-        self.date.setVal(newData.date)
+        self.date.setDateText(newData.date)
         self.location.setVal(newData.wakeLocation)
         self.target.setVal(newData.target)
         self.actual.setVal(newData.actual)
@@ -162,7 +162,7 @@ class sleepFrame(tk.Frame):
         return
 
     def clearData(self):
-        self.date.setVal("")
+        self.date.setDateText(curDate())
         self.location.setVal("")
         self.target.setVal("")
         self.actual.setVal("")
@@ -176,13 +176,13 @@ class sleepFrame(tk.Frame):
         return
 
     def setDate(self,newDate):
-        self.date.setVal(newDate)
+        self.date.setDateText(newDate)
 
         newData = self.fetchSleepData(newDate)
 
         if newData == None:
             self.setData(sleepDataDefault)
-            self.date.setVal(newDate)
+            self.date.setDateText(newDate)
             return
 
         self.setData(newData)
@@ -192,8 +192,9 @@ class sleepFrame(tk.Frame):
         # What data to display; what warnings if no existing data
 
     def fetchSleepData(self,date):
+        wkDate = stampFromDate(date)
         sqlStr = str.format("SELECT * FROM {} WHERE Date = (?)",self.dataTable)
-        cur = self.dbConn.execute(sqlStr,(date,))
+        cur = self.dbConn.execute(sqlStr,(wkDate,))
         res = cur.fetchone()
         if res == None:
             return None
@@ -228,7 +229,8 @@ class sleepFrame(tk.Frame):
         self.saveFlag.setVal(True)
         self.saveData()
         self.saveFlag.setVal(False)
-        self.date.setVal(nextDay(self.date.getVal()))
+        #self.date.setVal(nextDay(self.date.getVal()))
+        self.date.stepDate()
         self.target.takeFocus()
 
 
@@ -242,22 +244,23 @@ class sleepFrame(tk.Frame):
             return True
 
         saveSleep = self.getData()
+        newSaveSleep = saveSleep._replace(date=self.date.getDateStamp())
 
-        replaceSql(self.dbConn,self.dataTable,self.dataCols,saveSleep)
+        replaceSql(self.dbConn,self.dataTable,self.dataCols,newSaveSleep)
 
         self.dbConn.commit()
         self.refreshView()
 
-        self.statusBox.addLine("Saved Sleep Data for {}".format(self.date.getVal()))
+        self.statusBox.addLine("Saved Sleep Data for {}".format(self.date.getDateText()))
 
         return True
 
     def initialView(self):
-        res = self.dbConn.execute("SELECT * FROM SleepData WHERE sortableDate(Date)>=sortableDate(?) ORDER BY sortableDate(Date)",[self.viewStart.getVal()]).fetchall()
+        res = self.dbConn.execute("SELECT * FROM SleepData WHERE Date>=? ORDER BY Date",[self.viewStart.getDateStamp()]).fetchall()
         self.displayDateSet = set()
         for ln in res:
             self.displayDateSet.add(ln["Date"])
-            viewLine = (ln["Date"],
+            viewLine = (dateFromStamp(ln["Date"]),
                         ln["Target"],
                         ln["Actual"],
                         self.calcSleepTime(ln["Actual"],ln["WakeTime"]),
@@ -268,12 +271,12 @@ class sleepFrame(tk.Frame):
                         ln["VivofitLight"],
                         ln["VivofitAwake"])
             self.addSleepView(viewLine)
-        allDateSet=daysSince(self.viewStart.getVal())
+        allDateSet={stampFromDate(ln) for ln in daysSince(self.viewStart.getVal())}
         missingDates=sorted(list(allDateSet-self.displayDateSet))
         tmpStr=str.format("{} of {}",len(missingDates),len(allDateSet))
         self.missingLabel.setVal(tmpStr)
         for ln in missingDates:
-            self.missingDaysList.addLine(ln)
+            self.missingDaysList.addLine(dateFromStamp(ln))
 ##        if len(missingDates)>0:
 ##            self.missingDaysList.setSelection(0)
         
