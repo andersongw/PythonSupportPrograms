@@ -1,4 +1,4 @@
-# Last Edited 11/23/17
+# Last Edited 01/16/18
 import tkinter as tk
 from tkinter import ttk
 import tkinter.messagebox as tkmb
@@ -113,19 +113,20 @@ class dayData(tk.Frame):
         self.refreshDispFn()
 
     def popView(self,event=None):
+        """This function populates the JournalView control"""
         self.journalView.clearTree()
         self.displaySet = set()
-        sqlStr = str.format("SELECT * FROM {} WHERE sortableDate(Date)>= sortableDate(?) ORDER BY sortableDate(Date)",self.dataTable)
-        res = self.dbConn.execute(sqlStr,[self.viewStartDate.getVal()]).fetchall()
+        sqlStr = str.format("SELECT * FROM {} WHERE Date>= ? ORDER BY Date",self.dataTable)
+        res = self.dbConn.execute(sqlStr,[self.viewStartDate.getDateStamp()]).fetchall()
         for ln in res:
             self.displaySet.add(ln["Date"])
-            self.journalView.addLine("",ln["Date"],ln[2:])
+            self.journalView.addLine("",dateFromStamp(ln["Date"]),ln[2:])
 
-        allDateSet = daysSince(self.viewStartDate.getVal())
+        allDateSet = {stampFromDate(ln) for ln in daysSince(self.viewStartDate.getDateText())}
         missingDates = sorted(list(allDateSet-self.displaySet))
         tmpStr = str.format("{} of {}",len(missingDates),len(allDateSet))
         for ln in missingDates:
-            self.missingDates.addLine(ln)
+            self.missingDates.addLine(dateFromStamp(ln))
 
     def pickDay(self,event=None):
         selIID = self.journalView.getSelection()[0]
@@ -133,6 +134,15 @@ class dayData(tk.Frame):
         newData=self.fetchJournalData(popDate)
         self.setData(newData)
         
+    def pickDate(self,event=None):
+        """This function is the handler for Button release in the missingDates 
+        view; why is it fetching data from the database for dates that 
+        couldn't be found in the database?"""
+        curLine = self.missingDates.getSelection() # Returns a string because missingDates is a listbox control, not a treeview
+#        print(curLine)
+#        newData=self.fetchJournalData(curLine)
+#        self.setData(newData)
+        self.date.setDateText(curLine)
         
 
     def delBook(self,event = None):
@@ -141,6 +151,7 @@ class dayData(tk.Frame):
         delTitle = self.bookView.getText(selIID)
         delDateIID = self.bookView.getCurParent(selIID)
         delDate = self.bookView.getText(delDateIID)
+        print(delDate)
         delBook= bookData(delDate,delTitle,delFormat)
 
         bookSet = fetchSql(self.dbConn,self.bookTable,self.bookCols,delBook)
@@ -170,10 +181,6 @@ class dayData(tk.Frame):
 ##        for ln in res:
 ##            self.missingDates.addLine(ln["Date"])
 
-    def pickDate(self,event=None):
-        curLine = self.missingDates.getSelection()
-        newData=self.fetchJournalData(curLine)
-        self.setData(newData)
 
     def tabJump(self,delta):
         self.tabs.select(2+delta)
@@ -254,7 +261,7 @@ class dayData(tk.Frame):
         
     def getData(self):
         outJournal = dayJournal(
-            self.date.getVal(),
+            self.date.getDateText(),
             self.steps.getVal(),
             self.stepGoal.getVal(),
             self.stepDist.getVal(),
@@ -264,7 +271,7 @@ class dayData(tk.Frame):
             self.moviesTV.getVal(),
             self.proj.getVal())
         outBook = bookData(
-            self.date.getVal(),
+            self.date.getDateText(),
             self.bookTitle.getVal(),
             self.bookFormat.getVal())
         return (outJournal,outBook)
@@ -283,25 +290,29 @@ class dayData(tk.Frame):
             return True
 
         journalData,bookInfo = self.getData()
+        newJournalData = journalData._replace(date = stampFromDate(journalData.date))
+        newBookInfo = bookInfo._replace(date = stampFromDate(bookInfo.date))
 
-        replaceSql(self.dbConn,self.dataTable,self.dataCols,journalData)
+        replaceSql(self.dbConn,self.dataTable,self.dataCols,newJournalData)
 
         if self.bookFormat.getVal()!="None":
-            insertSql(self.dbConn,self.bookTable,self.bookCols,bookInfo)
+            insertSql(self.dbConn,self.bookTable,self.bookCols,newBookInfo)
 
         self.refreshDispFn()
-        self.statusBox.addLine("Saved Journal Data for {}".format(self.date.getVal()))
+        self.statusBox.addLine("Saved Journal Data for {}".format(self.date.getDateText()))
 
         return True
 
     def saveBook(self):
         bookSave=self.getData()[1]
-        insertSql(self.dbConn,self.bookTable,self.bookCols,bookSave)
+        newBookSave = bookSave._replace(date=stampFromDate(bookSave.date))
+        insertSql(self.dbConn,self.bookTable,self.bookCols,newBookSave)
 ##        sqlStr = str.format("INSERT into {} ({}) VALUES ({})",self.bookTable,",".join(self.bookCols),"?"+",?"*(len(self.bookCols)-1))
 ##        self.dbConn.execute(sqlStr,self.getData()[1])        
 ##        self.dbConn.commit()
+
         self.addBookLine(bookSave)
-        self.statusBox.addLine("Saved Book Data for {}".format(self.date.getVal()))
+        self.statusBox.addLine("Saved Book Data for {}".format(self.date.getDateText()))
 
 
     def setData(self,newData):
@@ -314,7 +325,7 @@ class dayData(tk.Frame):
         if newBook == None:
             newBook = bookDataDefault
         
-        self.date.setVal(newJournal.date)
+        self.date.setDateText(newJournal.date)
         self.steps.setVal(newJournal.steps)
         self.stepGoal.setVal(newJournal.stepGoal)
         self.stepDist.setVal(newJournal.stepDist)
@@ -331,18 +342,26 @@ class dayData(tk.Frame):
         return
 
     def calcAvgStride(self,event=None):
-        steps = int(self.steps.getVal())
-        dist = self.stepDist.getVal()
-        if dist!=None and dist!="None":
-            dist=float(dist)
+        try:
+            steps = int(self.steps.getVal())
+            dist = float(self.stepDist.getVal())
             stride = str.format("{:1.2f} ft/step, {:d} steps/mile",(5280.*dist)/steps, int(steps/dist))
-        else:
+        except TypeError:
             stride = "None"
+        except ZeroDivisionError:
+            stride = "Zero Steps or Dist"
+        
+#        if dist!=None and dist!="None":
+#            dist=float(dist)
+#            stride = str.format("{:1.2f} ft/step, {:d} steps/mile",(5280.*dist)/steps, int(steps/dist))
+#        else:
+#            stride = "None"
+            
         self.stepAvg.setVal(stride)
 
 
     def clearData(self):
-        self.date.setVal("")
+        self.date.setDateText(curDate())
         self.steps.setVal("")
         self.stepGoal.setVal("")
         self.stepDist.setVal("")
@@ -355,14 +374,17 @@ class dayData(tk.Frame):
         self.proj.setVal("")
         return
 
-    def fetchJournalData(self,date):
+    def fetchJournalData(self,dateTxt):
+        """Retrieves the DayJournal data from the database.  Takes a date
+        parameter formatted as a posix timestamp."""
+        date = stampFromDate(dateTxt)
         sqlStrDay = str.format("SELECT * FROM {} WHERE Date = (?)",self.dataTable)
         sqlStrBook = str.format("SELECT * FROM {} WHERE Date = (?)",self.bookTable)
         dayRes = self.dbConn.execute(sqlStrDay,(date,)).fetchone()
         bookRes = self.dbConn.execute(sqlStrBook,(date,)).fetchall()
         if dayRes != None:
             newJournal = dayJournal(
-                dayRes["Date"],
+                dateFromStamp(dayRes["Date"]),
                 dayRes["Steps"],
                 dayRes["StepGoal"],
                 dayRes["StepDistance"],
@@ -376,7 +398,7 @@ class dayData(tk.Frame):
             
         if len(bookRes)>0:
             newBook = [bookData(
-                            ln["Date"],
+                            dateFromStamp(ln["Date"]),
                             ln["BookTitle"],
                             ln["BookFormat"]) for ln in bookRes]
             
@@ -386,11 +408,13 @@ class dayData(tk.Frame):
         return (newJournal,newBook[0])
 
     def setDate(self,newDate):
+        print("something called setDate")
         self.date.setVal(newDate)
 
         self.setData(self.fetchJournalData(newDate))
 
     def addBookLine(self,newBook):
+        print("Line 407 ",newBook.date)
         dateIID = self.bookView.getIID(newBook.date) #'date bookTitle bookFormat'        
         if dateIID == "":
             newIID = self.bookView.addLine(dateIID,newBook.date,[])#["",""])
@@ -399,14 +423,15 @@ class dayData(tk.Frame):
             self.bookView.addLine(dateIID,newBook.bookTitle,[newBook.bookFormat])
 
     def popRecentBooks(self):
-        workDate=self.viewStartDate.getVal()
-        sqlStrBook = str.format("SELECT * FROM {} WHERE sortableDate(Date)>= (sortableDate(?)) ORDER BY sortableDate(Date)",self.bookTable)
+        workDate=self.viewStartDate.getDateStamp()
+        sqlStrBook = str.format("SELECT * FROM {} WHERE Date>= ? ORDER BY Date",self.bookTable)
         bookRes = self.dbConn.execute(sqlStrBook,[workDate]).fetchall()
 
         if len(bookRes)>0:
             for ln in bookRes:
+                print(ln["Date"])
                 self.addBookLine(bookData(
-                            ln["Date"],
+                            dateFromStamp(ln["Date"]),
                             ln["BookTitle"],
                             ln["BookFormat"]))
                 

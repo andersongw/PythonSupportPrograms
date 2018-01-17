@@ -1,4 +1,4 @@
-# Last Edited 12/05/17
+# Last Edited 01/16/18
 import tkinter as tk
 from tkinter import ttk
 import tkinter.simpledialog as tksd
@@ -187,7 +187,7 @@ def insertSql(db,table,cols,data):#cols and data must be iterables (lists,tuples
     sql = str.format("INSERT INTO {} ({}) VALUES ({})", table, ",".join(cols), "?"+",?"*(len(cols)-1))
     cur = db.execute(sql,data)
     rowID = cur.lastrowid
-    db.commit()
+    db.commit()  # Commits after every insert; maybe don't want this?
     return rowID
 
 def replaceSql(db,table,cols,data):#cols and data must be iterables (lists,tuples, etc.)
@@ -309,7 +309,9 @@ def isValidDate(workDate):
     return stdDateRegex.match(cleanDate(workDate))!=None
 
 def sortableDate(workDate):
-    """Returns a date formatted as YYYY-MM-DD, which allows the data to be sorted by date."""
+    """Returns a date formatted as YYYY-MM-DD, which allows the data to be sorted by date.
+    (As of Jan 2018, moving to using a Posix timestamp to store dates, so this is obsolete)"""
+    print("Call to sortable Date; need to update code")
     try:
         parseDate = stdDateRegex.match(workDate).groupdict()
     except AttributeError:
@@ -320,6 +322,7 @@ def sortableDate(workDate):
 def sortableTimestamp(workStamp):
     """Reformats a mm/dd/yy hh:mm:ss time stamp (recorded in database) to a sortable format (
     """
+    print("Called sortableTimestamp; need to rewrite code")
     sortedStamp = dt.datetime.strptime(workStamp,"%m/%d/%y %H:%M:%S")
     return sortedStamp.strftime("%y/%m/%d %H:%M:%S")
 
@@ -366,6 +369,8 @@ def monthDelta(oldDate,dMonth):
     Input parameters:
     oldDate: the original date to be modified
     dMonth: the number of months to be modified (can be negative)
+    
+    returns a datetime object
     """
     m = oldDate.month-1
     d = oldDate.day
@@ -377,20 +382,44 @@ def monthDelta(oldDate,dMonth):
     newY = y+dy
 
     try:
-        newDate = dt.date(newY,newM,d)
+        newDate = dt.datetime(newY,newM,d)
 
     except ValueError:
         dum,lastDay = cal.monthrange(newY,newM)
-        newDate=dt.date(newY,newM,lastDay)
+        newDate=dt.datetime(newY,newM,lastDay)
         
     return newDate
 
-def curDate():
-    """Returns the current date formatted according to mm/dd/yy"""
-    return dt.date.today().strftime("%m/%d/%y")
+def curDate(fmt="%m/%d/%y"):
+    """Returns the current date formatted according to fmt 
+    (defaults to mm/dd/yy)"""
+    return dt.date.today().strftime(fmt)
+
+def curDateStamp():
+    """Returns a Posix timestamp corresponding to the current date 
+    (specifically midnight -- time t=00:00)"""
+    return dt.datetime.combine(dt.date.today(),dt.time()).timestamp()
+
+def dateFromStamp(stamp,fmt="%m/%d/%y"):
+    """Given a Posix time stamp, return a date formatted per fmt (defaults to 
+    mm/dd/yy)"""
+    try:
+        return dt.datetime.fromtimestamp(stamp).strftime(fmt)
+    except:
+        print("Nope,",stamp,",407")
+        return None
+    
+def stampFromDate(wkDate,fmt="%m/%d/%y"):
+    """Returns a Posix time stamp given a date formatted according to fmt 
+    (Defaults to mm/dd/yy)"""
+    try:
+        return dt.datetime.strptime(wkDate,fmt).timestamp()
+    except:
+        print("Nope,",stamp,",416")
+        return None
 
 def curTime():
-    """Returns the current time formatted according to hh:mm (24 hr format"""
+    """Returns the current time formatted according to hh:mm (24 hr format)"""
     return dt.datetime.now().strftime("%H:%M")
 
 def curDateTime():
@@ -998,16 +1027,28 @@ class dataFieldLeft():
         self.field["validatecommand"]=validCommand
 
 class dateFieldLeft(dataFieldLeft):
+    """ This control provides an Edit field with the label on the left and 
+    specialized functions for operating on date data.  There is an internal
+    datetime object that corresponds to the date displayed.  There is also an 
+    override of the setVal() function that makes it an alias of the
+    setDateText() function."""
+    
     def __init__(self,master=None,label="Default",r=0,c=0,w=1,initVal=""):
         dataFieldLeft.__init__(self,master,label,r,c,w,initVal)
-        self.dateInit()
+        print(initVal)
+        self.dateInit(initVal)
 
-    def dateInit(self):
+    def dateInit(self,initDate):
         self.acceptDate = {"ASAP","asap"}
         self.autoFormatStr="%m/%d/%y"
 
         self.field.bind("<MouseWheel>",self.stepDate)
         self.field.bind("<FocusOut>",self.exitDateField)
+        
+        print(initDate)
+        
+        if not self.setDateText(initDate):
+            self.curDatetime = dt.datetime.now()
 
         
     def setAutoFormat(self,newFormatStr):
@@ -1018,8 +1059,78 @@ class dateFieldLeft(dataFieldLeft):
 
     def dropAcceptDate(self,badDate):
         self.acceptDate.discard(badDate)
+        
+    def setDateTime(self,newDatetime):
+        """Directly set the internal datetime object; assuming it is a proper
+        datetime object.  If not, returns False and doesn't change anything."""
+    
+        try:
+            newTxt = newDatetime.strftime(self.autoFormatStr)
+            self.curDatetime = newDatetime
+            self.data.set(newTxt)
+            return True
+        except AttributeError:
+            print(newDatetime," is not a datetime object")
+            return False
+
+        
+    def getDateTime(self):
+        return self.curDatetime
+    
+    def setVal(self,newVal):
+        """Alias for the setDateText() function (since previous implementation 
+        is basically the same functionality.)"""
+        self.setDateText(newVal)
+        
+    def setDateText(self,newDatetext):
+        """Set the displayed text directly, assuming the new value is a proper
+        date.  If so, also sets the internal datetime property and returns 
+        true.  If not, returns false and doesn't change anything."""
+        if newDatetext in self.acceptDate:
+            self.data.set(newDatetext)
+            self.curDatetime = dt.datetime.now()
+            return True
+        try:
+            newDatetime = dt.datetime.strptime(newDatetext,self.autoFormatStr)
+            self.curDatetime = newDatetime
+            self.data.set(newDatetext)
+            return True
+        except AttributeError:
+            print(newDatetext," is not a string formatted as ",self.autoFormatStr)
+            return False
+        except ValueError:
+            print(newDatetext," is not formatted correctly")
+            return False
+        
+    def getDateText(self):
+        """Return the control value"""
+        return self.data.get().strip()
+        
+    def setDateStamp(self,newDatestamp):
+        """Set the internal date to correspond to the specified posix
+        timestamp, assuming the new value is a proper stamp.  If so, also sets
+        the internal datetime property and returns true.  If not, returns 
+        false and doesn't change anything."""
+        try:
+            newDatetime = dt.datetime.fromtimestamp(newDatestamp)
+            newDatetext = newDatetime.strftime(self.autoFormatStr)
+            self.curDatetime = newDatetime
+            self.data.set(newDatetext)
+            return True
+        except AttributeError:
+            print(newDatestamp, " is not a valid posix timestamp")
+            return False
+        
+    def getDateStamp(self):
+        """Return the posix timestamp corresponding to the control value."""
+        return self.curDatetime.timestamp()
+            
+
+        
 
     def exitDateField(self,event=None):
+        """Handler called to validate the control contents when it loses 
+        focus."""
         
         orig = self.data.get()
         if orig in self.acceptDate:
@@ -1031,10 +1142,12 @@ class dateFieldLeft(dataFieldLeft):
 
         self.field.bell()
         self.field.focus_set()
-
             
 
     def stepDate(self,event):
+        """Handler called when the scroll wheel is used to increment/decrement
+        the date.  Holding Ctrl when scrolling adjusts the date by a month
+        rather than a day."""
         try:
             origDate = dt.datetime.strptime(cleanDate(self.data.get()),"%m/%d/%y")
 
@@ -1053,11 +1166,15 @@ class dateFieldLeft(dataFieldLeft):
             newDate = origDate+dt.timedelta(step)
 
         self.data.set(newDate.strftime(self.autoFormatStr))
+        self.curDatetime = newDate
             
 class dateFieldTop(dateFieldLeft):
+    """Same class as dateFieldLeft, except that the label appears above the 
+    edit box."""
+    
     def __init__(self,master=None,label="Default",r=0,c=0,w=1,initVal=""):
         dataFieldTop.__init__(self,master,label,r,c,w,initVal)
-        self.dateInit()
+        self.dateInit(initVal)
 
 ###############
 #
