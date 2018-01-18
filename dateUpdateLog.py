@@ -32,13 +32,19 @@ except:
 #for idNum,dateStr in allDates:
 #    curDB.execute("UPDATE SleepData SET DateStamp = ? WHERE DayID = ?",[dt.datetime.strptime(dateStr,"%m/%d/%y").timestamp(),idNum])
     
-allDates = curDB.execute("SELECT BellaCareID,Date FROM BellaCareTracking").fetchall()
-for idNum,dateStr in allDates:
-    curDB.execute("UPDATE BellaCareTracking SET DateStamp = ? WHERE BellaCareID = ?",[dt.datetime.strptime(dateStr,"%m/%d/%y").timestamp(),idNum])
+#allDates = curDB.execute("SELECT BellaCareID,Date FROM BellaCareTracking").fetchall()
+#for idNum,dateStr in allDates:
+#    curDB.execute("UPDATE BellaCareTracking SET DateStamp = ? WHERE BellaCareID = ?",[dt.datetime.strptime(dateStr,"%m/%d/%y").timestamp(),idNum])
+#
+#allDates = curDB.execute("SELECT ArabellaID,Date FROM BellaData").fetchall()
+#for idNum,dateStr in allDates:
+#    curDB.execute("UPDATE BellaData SET DateStamp = ? WHERE ArabellaID = ?",[dt.datetime.strptime(dateStr,"%m/%d/%y").timestamp(),idNum])
 
-allDates = curDB.execute("SELECT ArabellaID,Date FROM BellaData").fetchall()
+allDates = curDB.execute("SELECT WeighID,WeighDate FROM WeightWatchersScale").fetchall()
 for idNum,dateStr in allDates:
-    curDB.execute("UPDATE BellaData SET DateStamp = ? WHERE ArabellaID = ?",[dt.datetime.strptime(dateStr,"%m/%d/%y").timestamp(),idNum])
+    curDB.execute("UPDATE WeightWatchersScale SET DateStamp = ? WHERE WeighID = ?",[dt.datetime.strptime(dateStr,"%m/%d/%y").timestamp(),idNum])
+
+
 
 curDB.commit()
 curDB.close()

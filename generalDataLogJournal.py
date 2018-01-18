@@ -1,4 +1,4 @@
-# Last Edited 01/16/18
+# Last Edited 01/17/18
 import tkinter as tk
 from tkinter import ttk
 import tkinter.messagebox as tkmb
@@ -78,6 +78,7 @@ class dayData(tk.Frame):
 
         self.bookViewCfg = [treeColTpl("form",100,"Format")]
         self.bookView = treeView(self.bookFrame.frame,None,self.bookViewCfg,3)
+        self.bookView.bindField("<<TreeviewSelect>>",self.selBook)
         self.bookView.bindField("<Double-Button-1>",self.delBook)
         
         self.viewFrame = formFrame(self,"View",8,0,8)
@@ -144,6 +145,21 @@ class dayData(tk.Frame):
 #        self.setData(newData)
         self.date.setDateText(curLine)
         
+    def selBook(self,event=None):
+        selIID = self.bookView.getSelection()[0]
+        selFormat=self.bookView.getValues(selIID)[0]
+        selTitle = self.bookView.getText(selIID)
+        selDateIID = self.bookView.getCurParent(selIID)
+        selDate = self.bookView.getText(selDateIID)
+        
+        self.bookTitle.setVal(selTitle)
+        self.bookFormat.setVal(selFormat)
+        self.date.setDateText(selDate)
+        
+        newData=self.fetchJournalData(selDate)
+        self.setData(newData)
+        
+        
 
     def delBook(self,event = None):
         selIID = self.bookView.getSelection()[0]
@@ -152,7 +168,7 @@ class dayData(tk.Frame):
         delDateIID = self.bookView.getCurParent(selIID)
         delDate = self.bookView.getText(delDateIID)
         print(delDate)
-        delBook= bookData(delDate,delTitle,delFormat)
+        delBook= bookData(stampFromDate(delDate),delTitle,delFormat)
 
         bookSet = fetchSql(self.dbConn,self.bookTable,self.bookCols,delBook)
         if len(bookSet)>0:

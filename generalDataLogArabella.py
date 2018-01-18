@@ -1,4 +1,4 @@
-# Last Edited 11/23/17
+# Last Edited 01/17/18
 import tkinter as tk
 from tkinter import ttk
 import tkinter.messagebox as tkmb
@@ -110,9 +110,9 @@ class bellaDataFrm(tk.Frame):
         self.careTime.setVal(careTime)
         self.careNote.setVal(careTxt)
         dateIID = self.careView.getCurParent(selIID)
-        curDate = self.careView.getText(dateIID)
-        self.date.setVal(curDate)
-        (wakeData,careData)=self.fetchArabellaData(curDate)
+        wkDate = self.careView.getText(dateIID)
+        self.date.setDateText(wkDate)
+        (wakeData,careData)=self.fetchArabellaData(wkDate)
         self.setWake(wakeData)
         
         
@@ -143,20 +143,20 @@ class bellaDataFrm(tk.Frame):
         
     def popWakeView(self):
         self.wakeView.clearTree()
-        tmpStr=str.format("SELECT * FROM {} WHERE sortableDate(Date)>=? ORDER BY sortableDate(Date)",self.dataTable)
-        res=self.dbConn.execute(tmpStr,[sortableDate(self.startDate.getVal())]).fetchall()
+        tmpStr=str.format("SELECT * FROM {} WHERE Date>=? ORDER BY Date",self.dataTable)
+        res=self.dbConn.execute(tmpStr,[self.startDate.getDateStamp()]).fetchall()
         for ln in res:
-            self.wakeView.addLine("",ln["Date"],[ln["WakeTime"],ln["SleepNote"]])
+            self.wakeView.addLine("",dateFromStamp(ln["Date"]),[ln["WakeTime"],ln["SleepNote"]])
 
         self.careView.clearTree()
-        tmpStr=str.format("SELECT * FROM {} WHERE sortableDate(Date)>=? ORDER BY sortableDate(Date)",self.careTable)
-        res=self.dbConn.execute(tmpStr,[sortableDate(self.startDate.getVal())]).fetchall()
+        tmpStr=str.format("SELECT * FROM {} WHERE Date>=? ORDER BY Date",self.careTable)
+        res=self.dbConn.execute(tmpStr,[self.startDate.getDateStamp()]).fetchall()
         for ln in res:
             wkID = ln["BellaCareID"]
-            wkDate = ln["Date"]
-            lineIID=self.careView.getIID(ln["Date"])
+            wkDate = dateFromStamp(ln["Date"])
+            lineIID=self.careView.getIID(wkDate)
             if lineIID == "":
-                lineIID=self.careView.addLine(lineIID,ln["Date"],[])
+                lineIID=self.careView.addLine(lineIID,wkDate,[])
             self.careView.addLineID(lineIID,"",[ln["CareTime"],ln["CareNote"]],dataID=ln["BellaCareID"])
             
 
@@ -174,11 +174,11 @@ class bellaDataFrm(tk.Frame):
     def getData(self):
         
         newWake = bellaData(
-           self.date.getVal(),
+           self.date.getDateText(),
            self.wakeTime.getVal(),
            self.wakeNote.getVal())
         newCare = bellaCareData(
-           self.date.getVal(),
+           self.date.getDateText(),
            self.careTime.getVal(),
            self.careNote.getVal())
         return (newWake,newCare)
@@ -190,14 +190,17 @@ class bellaDataFrm(tk.Frame):
         if not self.saveFlag.getVal():
             return True        
         
-        saveWake,saveCare = self.getData()
+        wake,care = self.getData()
+        wkStamp = self.date.getDateStamp()
+        saveWake = wake._replace(date=wkStamp)
+        saveCare = care._replace(date=wkStamp)
 
         replaceSql(self.dbConn,self.dataTable,self.dataCols,saveWake)
         if self.careTime.getVal()!="None":
             insertSql(self.dbConn,self.careTable,self.careCols,saveCare)
             self.popWakeView()
 
-        self.statusBox.addLine("Saved Bella Data for {}".format(self.date.getVal()))
+        self.statusBox.addLine("Saved Bella Data for {}".format(self.date.getDateText()))
         
         return True
 
@@ -207,19 +210,22 @@ class bellaDataFrm(tk.Frame):
 ##        sqlStr = str.format("INSERT into {} ({}) VALUES ({})",self.careTable,",".join(self.careCols),"?"+",?"*(len(self.careCols)-1))
 ##        self.dbConn.execute(sqlStr,saveCare)
         wake,care= self.getData()
-        insertSql(self.dbConn,self.careTable,self.careCols,care)
+        dateStamp = self.date.getDateStamp()
+        newWake = wake._replace(date = dateStamp)
+        newCare = care._replace(date = dateStamp)
+        insertSql(self.dbConn,self.careTable,self.careCols,newCare)
         self.addCareToView(care)
-        self.statusBox.addLine("Saved Care Only Data for {}".format(self.date.getVal()))
+        self.statusBox.addLine("Saved Care Only Data for {}".format(self.date.getDateText()))
         
 
     def setWake(self,newWake):
-        self.date.setVal(newWake.date)
+        self.date.setDateText(newWake.date)
         self.wakeTime.setVal(newWake.wakeTime)
         self.wakeNote.setVal(newWake.wakeNote)        
 
     def setData(self,newData):
         newWake,newCare = newData
-        self.date.setVal(newWake.date)
+        self.date.setDateText(newWake.date)
         self.careTime.setVal(newCare.careTime)
         self.careNote.setVal(newCare.careNote)
         self.wakeTime.setVal(newWake.wakeTime)
@@ -227,7 +233,7 @@ class bellaDataFrm(tk.Frame):
         return
     
     def clearData(self):
-        self.date.setVal("")
+        self.date.setDateText(curDate())
         self.careTime.setVal("")
         self.careNote.setVal("")
         self.wakeTime.setVal("")
@@ -235,25 +241,27 @@ class bellaDataFrm(tk.Frame):
         return
 
     def setDate(self,newDate):
-        self.date.setVal(newDate)
+        self.date.setDateText(newDate)
         #tkmb.showinfo(self,self.fetchArabellaData(newDate))
         # Need to decide what to do here when the date is changed;
         # What data to display; what warnings if no existing data
 
     def fetchArabellaData(self,date):
-        cur = self.dbConn.execute("SELECT * FROM BellaData WHERE Date=(?)",(date,))
+        wkDate = stampFromDate(date)
+        print("Fetching Date ",date," or stamp ",wkDate)
+        cur = self.dbConn.execute("SELECT * FROM BellaData WHERE Date=(?)",(wkDate,))
         res = cur.fetchone()
         if res != None:
-            newBella = bellaData(res["Date"],
+            newBella = bellaData(dateFromStamp(res["Date"]),
                                    res["WakeTime"],
                                    res["SleepNote"])
         else:
             newBella = bellaDataDefault
             
-        cur = self.dbConn.execute("SELECT * FROM BellaCareTracking WHERE Date=(?)",(date,))
+        cur = self.dbConn.execute("SELECT * FROM BellaCareTracking WHERE Date=(?)",(wkDate,))
         res = cur.fetchone()
         if res != None:
-            newCare = bellaCareData(res["Date"],
+            newCare = bellaCareData(dateFromStamp(res["Date"]),
                                     res["CareTime"],
                                     res["CareNote"])
         else:

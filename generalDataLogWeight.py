@@ -1,4 +1,4 @@
-# Last Edited 11/23/17
+# Last Edited 01/17/18
 import tkinter as tk
 from tkinter import ttk
 import tkinter.messagebox as tkmb
@@ -78,13 +78,13 @@ class wwScaleData(tk.Frame):
         self.popView()
         
     def showRange(self):
-        sqlStr = "SELECT WeighDate,max(Weight) as lb FROM {} WHERE sortableDate(WeighDate)>sortableDate(?)".format(self.dataTable)
-        maxVal = self.dbConn.execute(sqlStr,[self.viewStart.getVal()]).fetchone()
-        sqlStr = "SELECT WeighDate,min(Weight) as lb FROM {} WHERE sortableDate(WeighDate)>sortableDate(?)".format(self.dataTable)
-        minVal = self.dbConn.execute(sqlStr,[self.viewStart.getVal()]).fetchone()
+        sqlStr = "SELECT WeighDate,max(Weight) as lb FROM {} WHERE WeighDate>?".format(self.dataTable)
+        maxVal = self.dbConn.execute(sqlStr,[self.viewStart.getDateText()]).fetchone()
+        sqlStr = "SELECT WeighDate,min(Weight) as lb FROM {} WHERE WeighDate>?".format(self.dataTable)
+        minVal = self.dbConn.execute(sqlStr,[self.viewStart.getDateText()]).fetchone()
 
-        self.viewMin.setVal("{} on {}".format(minVal["lb"],minVal["WeighDate"]))
-        self.viewMax.setVal("{} on {}".format(maxVal["lb"],maxVal["WeighDate"]))
+        self.viewMin.setVal("{} on {}".format(minVal["lb"],dateFromStamp(minVal["WeighDate"])))
+        self.viewMax.setVal("{} on {}".format(maxVal["lb"],dateFromStamp(maxVal["WeighDate"])))
         
         
 
@@ -95,19 +95,19 @@ class wwScaleData(tk.Frame):
 
     def popView(self,event=None):
         self.viewWeight.clearTree()
-        res = self.dbConn.execute("SELECT * FROM WeightWatchersScale WHERE sortableDate(WeighDate)>sortableDate(?) ORDER BY sortableDate(WeighDate)",[self.viewStart.getVal()]).fetchall()
+        res = self.dbConn.execute("SELECT * FROM WeightWatchersScale WHERE WeighDate>? ORDER BY WeighDate",[self.viewStart.getDateStamp()]).fetchall()
         for ln in res:
             val=wwScale._make(ln[1:])
             lean=str.format("{:4.1f}",val.weight-val.fatLb)
             ath = str.format("{:4.1f}",(val.weight-val.fatLb)/(1-0.15))
             norm = str.format("{:4.1f}",(val.weight-val.fatLb)/(1-0.2))
-            self.viewWeight.addLine("",ln["WeighDate"],[val.weight, val.fatLb,val.fat,lean,val.water,val.bone,ath,norm])
+            self.viewWeight.addLine("",dateFromStamp(ln["WeighDate"]),[val.weight, val.fatLb,val.fat,lean,val.water,val.bone,ath,norm])
         self.showRange()
 
 
     def getData(self):
         return wwScale(
-            self.date.getVal(),
+            self.date.getDateText(),
             float(self.weight.getVal()),
             float(self.fatLb.getVal()),
             float(self.fat.getVal()),
@@ -134,7 +134,7 @@ class wwScaleData(tk.Frame):
         self.saveFlag.setVal(True)
         self.saveData()
         self.saveFlag.setVal(False)
-        self.date.setVal(nextDay(self.date.getVal()))
+        self.date.stepDate()
 
     def connectStatus(self,statusBox):
         self.statusBox = statusBox
@@ -155,7 +155,7 @@ class wwScaleData(tk.Frame):
         self.popView()
 
 ##        sqlStr = str.format("DELETE FROM {} WHERE WeighDate = ?",self.dataTable)
-##        self.dbConn.execute(sqlStr,(self.date.getVal(),))
+##        self.dbConn.execute(sqlStr,(self.date.getDateText(),))
 ##
 ##        sqlStr = makeInsertStr(self.dataTable,self.dataCols)
 ##        #sqlStr = str.format("INSERT into {} ({}) VALUES ({})",self.dataTable,",".join(self.dataCols),"?"+",?"*(len(self.dataCols)-1))
@@ -163,7 +163,7 @@ class wwScaleData(tk.Frame):
 ##        
 ##        self.dbConn.commit()
 
-        self.statusBox.addLine("Saved Weight Data for {}".format(self.date.getVal()))
+        self.statusBox.addLine("Saved Weight Data for {}".format(self.date.getDateText()))
 
 
         return True
@@ -171,7 +171,7 @@ class wwScaleData(tk.Frame):
     def setData(self,newData):
         if newData == None:
             newData = wwScaleDefault
-        self.date.setVal(newData.date)
+        self.date.setDateText(newData.date)
         self.weight.setVal(str(newData.weight))
         self.fatLb.setVal(str(newData.fatLb))
         self.fat.setVal(str(newData.fat))
@@ -180,7 +180,7 @@ class wwScaleData(tk.Frame):
         return
 
     def clearData(self):
-        self.date.setVal("")
+        self.date.setDateText(curDate())
         self.weight.setVal("")
         self.fatLb.setVal("")
         self.fat.setVal("")
@@ -189,7 +189,7 @@ class wwScaleData(tk.Frame):
         return
 
     def setDate(self,newDate):
-        self.date.setVal(newDate)
+        self.date.setDateText(newDate)
         self.setData(self.fetchWWScaleData(newDate))
         #tkmb.showinfo(self,self.fetchWWScaleData(newDate))
         # Need to decide what to do here when the date is changed;
@@ -197,10 +197,11 @@ class wwScaleData(tk.Frame):
 
 
     def fetchWWScaleData(self,date):
-        cur = self.dbConn.execute("SELECT * FROM WeightWatchersScale WHERE WeighDate = (?)",(date,))
+        wkDate=stampFromDate(date)
+        cur = self.dbConn.execute("SELECT * FROM WeightWatchersScale WHERE WeighDate = (?)",(wkDate,))
         res = cur.fetchone()
         if res != None:
-            return wwScale(res["WeighDate"],
+            return wwScale(dateFromStamp(res["WeighDate"]),
                                 res["Weight"],
                                 res["BodyFatWeight"],
                                 res["BodyFatPercent"],                         
