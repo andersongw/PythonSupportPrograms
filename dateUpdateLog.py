@@ -40,9 +40,17 @@ except:
 #for idNum,dateStr in allDates:
 #    curDB.execute("UPDATE BellaData SET DateStamp = ? WHERE ArabellaID = ?",[dt.datetime.strptime(dateStr,"%m/%d/%y").timestamp(),idNum])
 
-allDates = curDB.execute("SELECT WeighID,WeighDate FROM WeightWatchersScale").fetchall()
-for idNum,dateStr in allDates:
-    curDB.execute("UPDATE WeightWatchersScale SET DateStamp = ? WHERE WeighID = ?",[dt.datetime.strptime(dateStr,"%m/%d/%y").timestamp(),idNum])
+allDef = curDB.execute("SELECT DefconID,Date, HRec, SRec FROM DefconData").fetchall()
+allRec = curDB.execute("SELECT RecID, Date FROM RecData").fetchall()
+recDates = {d for d,i in allRec}
+for idNum,dateStr,hr,sr in allDef:
+    stmp = dt.datetime.strptime(dateStr,"%m/%d/%y").timestamp()
+    curDB.execute("UPDATE DefconData SET DateStamp = ? WHERE DefconID = ?",[stmp,idNum])
+    if not dateStr in recDates:
+        curDB.execute("INSERT INTO RecData (DateStamp,HRec,SRec) VALUES (?,?,?)",[stmp,hr,sr])
+for idNum,dateStr in allRec:
+    curDB.execute("UPDATE RecData SET DateStamp = ? WHERE RecID = ?",[dt.datetime.strptime(dateStr,"%m/%d/%y").timestamp(),idNum])
+   
 
 
 

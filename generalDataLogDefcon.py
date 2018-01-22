@@ -1,4 +1,4 @@
-# Last Edited 11/23/17
+# Last Edited 01/19/18
 import tkinter as tk
 from tkinter import ttk
 import tkinter.messagebox as tkmb
@@ -103,17 +103,17 @@ class defconData(tk.Frame):
         """
 
         #  First -- populate the defcon tree
-        res = self.dbConn.execute("SELECT * FROM DefconData WHERE sortableDate(Date)>=sortableDate(?) ORDER BY sortableDate(Date)",[self.viewStart.getVal()]).fetchall()
+        res = self.dbConn.execute("SELECT * FROM DefconData WHERE Date>=? ORDER BY Date",[self.viewStart.getDateStamp()]).fetchall()
         self.displaySet = set()
         rec_iid = {}
         for ln in res:
-            self.displaySet.add(ln["Date"])
+            self.displaySet.add(dateFromStamp(ln["Date"]))
             viewLine = ("",
                         ln["ExternalDefcon"],
                         ln["InternalDefcon"],
                         ln["DefconNote"])
             rec_iid=self.defconTree.addLine("",ln["Date"],viewLine)
-        allDateSet = daysSince(self.viewStart.getVal())
+        allDateSet = daysSince(self.viewStart.getDateText())
         missingDays=sorted(list(allDateSet-self.displaySet))
         tmpStr=str.format("{} of {}",len(missingDays),len(allDateSet))
         for ln in missingDays:
@@ -124,7 +124,7 @@ class defconData(tk.Frame):
             print(ln)
 
         # Second -- populate the rec tree
-        res = self.dbConn.execute("SELECT * FROM RecData WHERE sortableDate(Date)>=sortableDate(?) ORDER BY sortableDate(Date)",[self.viewStart.getVal()]).fetchall()
+        res = self.dbConn.execute("SELECT * FROM RecData WHERE Date>=? ORDER BY Date",[self.viewStart.getDateStamp()]).fetchall()
         for ln in res:
             viewLine = (ln["HRec"],ln["SRec"])
             self.recTree.addLine("",ln["Date"],viewLine)
@@ -134,13 +134,13 @@ class defconData(tk.Frame):
         the next is expected.
         """
         #recentMen = self.dbConn.execute("SELECT sortableDate(Date) FROM RecData WHERE MenFlag = 1 ORDER BY sortableDate(Date) DESC").fetchall()
-        lastMen = self.dbConn.execute("SELECT max(sortableDate(Date))as date FROM RecData WHERE MenFlag = 1").fetchone()
+        lastMen = self.dbConn.execute("SELECT max(Date) as date FROM RecData WHERE MenFlag = 1").fetchone()
 ##        for ln in recentMen:
 ##            print(ln[:])
-        lastDate = dt.datetime.strptime(lastMen["date"],"%Y-%m-%d")
+        lastDate = datetimeFromStamp(lastMen["date"])
         expectDate = lastDate+dt.timedelta(21) #assume next starts 21 days after the last ends
         nextMen = expectDate.strftime("%Y-%m-%d")
-        self.menReportLast.setVal(lastMen["date"])
+        self.menReportLast.setVal(lastDate.strftime("%Y-%m-%d"))
         self.menReportNext.setVal(nextMen)
 
     def tabJump(self,delta):
@@ -148,12 +148,12 @@ class defconData(tk.Frame):
 
     def getData(self):
         return (defcon(
-                    self.date.getVal(),
+                    self.date.getDateText(),
                     int(self.ext.getVal()),
                     int(self.int.getVal()),
                     self.note.getVal()),
                 recData(
-                    self.date.getVal(),
+                    self.date.getDateText(),
                     bool(self.men.getVal()),
                     self.hrec.getVal(),
                     self.srec.getVal()))
@@ -180,7 +180,7 @@ class defconData(tk.Frame):
         insertSql(self.dbConn,self.dataTable,self.dataCols,saveDefcon)
         insertSql(self.dbConn,self.recTable,self.recCols,saveRec)
         
-        self.statusBox.addLine("Saved Full Defcon Data for {}".format(self.date.getVal()))
+        self.statusBox.addLine("Saved Full Defcon Data for {}".format(self.date.getDateText()))
 
         return True
 
@@ -190,14 +190,14 @@ class defconData(tk.Frame):
         self.dbConn.execute(sqlStr,saveDefcon)
         self.dbConn.commit()
 
-        self.statusBox.addLine("Saved Defcon Only Data for {}".format(self.date.getVal()))
+        self.statusBox.addLine("Saved Defcon Only Data for {}".format(self.date.getDateText()))
 
 
         return True
 
     def setData(self,newData):
         newDefcon,newRec = newData
-        self.date.setVal(newDefcon.date)
+        self.date.setDateText(newDefcon.date)
         self.men.setVal(newRec.menFlag)
         self.ext.setVal(newDefcon.ext)
         self.int.setVal(newDefcon.int)
@@ -206,7 +206,7 @@ class defconData(tk.Frame):
         self.srec.setVal(newRec.SRec)
 
     def clearData(self):
-        self.date.setVal("")
+        self.date.setDateText(curDate())
         self.men.setVal("")
         self.ext.setVal("")
         self.int.setVal("")
@@ -216,7 +216,7 @@ class defconData(tk.Frame):
         self.int.toggleEnable()
 
     def setDate(self,newDate):
-        self.date.setVal(newDate)
+        self.date.setDateText(newDate)
         #tkmb.showinfo(self,self.fetchDefconData(newDate))
         # Need to decide what to do here when the date is changed;
         # What data to display; what warnings if no existing data
@@ -225,7 +225,7 @@ class defconData(tk.Frame):
         cur = self.dbConn.execute("SELECT * FROM DefconData WHERE Date=(?) ORDER BY DefconID",(date,))
         res = cur.fetchone()
         if res != None:
-            newDefcon = defcon(res["Date"],
+            newDefcon = defcon(dateFromStamp(res["Date"]),
                                    res["ExternalDefcon"],
                                    res["InternalDefcon"],                          
                                    res["DefconNote"])
@@ -235,7 +235,7 @@ class defconData(tk.Frame):
         cur = self.dbConn.execute("SELECT * FROM RecData WHERE Date=(?) ORDER BY DefconID",(date,))
         res = cur.fetchone()
         if res != None:
-            newRec = recData(res["Date"],
+            newRec = recData(dateFromStamp(res["Date"]),
                                    res["MenFlag"],
                                    res["HRec"],
                                    res["SRec"])

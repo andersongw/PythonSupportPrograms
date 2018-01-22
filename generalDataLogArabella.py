@@ -1,4 +1,4 @@
-# Last Edited 01/17/18
+# Last Edited 01/19/18
 import tkinter as tk
 from tkinter import ttk
 import tkinter.messagebox as tkmb
@@ -66,6 +66,7 @@ class bellaDataFrm(tk.Frame):
         self.wakeView = treeView(self.recentFrame.frame,"Wake Data",self.wakeViewCfg,1,0,2)
         self.wakeView.setIconWidth(dateColWidth)
         self.wakeView.bindField("<<TreeviewSelect>>",self.pickDate)
+        self.wakeView.bindField("<Double-Button-1>",self.delWake)
 
 
         buttonRow = 9
@@ -97,6 +98,12 @@ class bellaDataFrm(tk.Frame):
         self.setWake(wakeData)
         print(careData)
         #should also set the current line in careView to the appropriate date
+    def delWake(self,event=None):
+        curLine = self.wakeView.getSelection()[0]
+        curDate = self.wakeView.getText(curLine)
+        (wakeData,careData)=self.fetchArabellaData(curDate)
+        curID = self.careView.getDataID(selIID)
+        
 
     def pickCare(self,event=None):
         selIID = self.careView.getSelection()[0]
@@ -127,6 +134,7 @@ class bellaDataFrm(tk.Frame):
         # Second, find the 
         selIID = self.careView.getSelection()[0]
         careData = self.careView.getValues(selIID)
+        print(careData)
         if len(careData)<2:
             return
         curID = self.careView.getDataID(selIID)
@@ -146,7 +154,7 @@ class bellaDataFrm(tk.Frame):
         tmpStr=str.format("SELECT * FROM {} WHERE Date>=? ORDER BY Date",self.dataTable)
         res=self.dbConn.execute(tmpStr,[self.startDate.getDateStamp()]).fetchall()
         for ln in res:
-            self.wakeView.addLine("",dateFromStamp(ln["Date"]),[ln["WakeTime"],ln["SleepNote"]])
+            self.wakeView.addLineID("",dateFromStamp(ln["Date"]),[ln["WakeTime"],ln["SleepNote"]],dataID=ln["ArabellaID"])
 
         self.careView.clearTree()
         tmpStr=str.format("SELECT * FROM {} WHERE Date>=? ORDER BY Date",self.careTable)

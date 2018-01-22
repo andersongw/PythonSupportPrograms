@@ -1,4 +1,4 @@
-# Last Edited 01/16/18
+# Last Edited 01/19/18
 import tkinter as tk
 from tkinter import ttk
 import tkinter.simpledialog as tksd
@@ -411,6 +411,13 @@ def dateFromStamp(stamp,fmt="%m/%d/%y"):
         return dt.datetime.fromtimestamp(stamp).strftime(fmt)
     except:
         print("Nope,",stamp,",407")
+        return None
+    
+def datetimeFromStamp(wkStamp):
+    try:
+        return dt.datetime.fromtimestamp(wkStamp)
+    except:
+        print("Nope ,",wkStamp," 420")
         return None
     
 def stampFromDate(wkDate,fmt="%m/%d/%y"):
