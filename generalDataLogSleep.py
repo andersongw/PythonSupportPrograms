@@ -1,4 +1,4 @@
-# Last Edited 01/17/18
+# Last Edited 01/25/18
 import tkinter as tk
 from tkinter import ttk
 import tkinter.messagebox as tkmb
@@ -199,7 +199,7 @@ class sleepFrame(tk.Frame):
         if res == None:
             return None
 
-        return sleepData(res["Date"],
+        return sleepData(dateFromStamp( res["Date"]),
                          res["Target"],
                          res["Actual"],
                          res["VivofitBegin"],
@@ -246,8 +246,9 @@ class sleepFrame(tk.Frame):
         saveSleep = self.getData()
         newSaveSleep = saveSleep._replace(date=self.date.getDateStamp())
 
-        replaceSql(self.dbConn,self.dataTable,self.dataCols,newSaveSleep)
-
+        #replaceSql(self.dbConn,self.dataTable,self.dataCols,newSaveSleep)
+        
+        self.dbConn.execute(f"REPLACE INTO {self.dataTable} ({','.join(self.dataCols)}) VALUES ({'?'+',?'*(len(self.dataCols)-1)})",newSaveSleep)
         self.dbConn.commit()
         self.refreshView()
 

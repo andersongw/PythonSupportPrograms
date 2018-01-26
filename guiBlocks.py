@@ -1,4 +1,4 @@
-# Last Edited 01/19/18
+# Last Edited 01/25/18
 import tkinter as tk
 from tkinter import ttk
 import tkinter.simpledialog as tksd
@@ -729,6 +729,9 @@ class dataComboBox():
 
         self.enable = True
         
+        self.quickFindDelay = 500
+        self.quickFindFlag = False
+        
         self.data = tk.StringVar()
         if len(dispVals)>0:
             self.data.set(dispVals[0])
@@ -738,7 +741,9 @@ class dataComboBox():
         tk.Label(master,text=label).grid(row=realRow,column = realCol,sticky=tk.S,rowspan=2)
         self.field = ttk.Combobox(master,values=dispVals,textvariable=self.data)
         self.field.grid(row=realRow,column=realCol+1,columnspan=realSpan-1,sticky=tk.W+tk.S+tk.E,rowspan=2)
-
+        
+        self.setQuickFind()
+        
     def getVal(self):
         return self.data.get().strip()
 
@@ -752,6 +757,9 @@ class dataComboBox():
             self.field.set(newData)
         # normally, ignore data that isn't part of the dropdown list
         # if ignore=False, go ahead and store the new data anyway
+        
+    def setQuickfindDelay(self,newVal):
+        self.quickFindDelay = newVal
 
 
     def getIndex(self):
@@ -759,11 +767,12 @@ class dataComboBox():
             
     def updateVals(self,newVals):
         self.useVals = newVals
+        self.quickLookupList = newVals
         self.field.config(values=newVals)
         try:
             self.setVal(newVals[0])
         except IndexError:
-            pass
+            print("Index error")
     
 
     def getDropList(self):
@@ -779,20 +788,34 @@ class dataComboBox():
         """Call this function to initiate a quick-lookup feature, where the selection
         jumps to the nearest match to the characters just typed.  If this function is called
         with a listof values arguments, it uses these values in a 1:1 correspondence to the values
-        in the drop down.  Otherwise it defaults to the list of values in the drop down."""
+        in the drop down.  Otherwise it defaults to the list of values in the drop down.
+        (For example, if names are displayed in alphabetical order by first name, 
+        the vals argument might be used to set the quickfind feature to operate on the
+        last name)"""
+        print("Setting quickfind")
         if vals == None:
-            self.quickLookupList = list(self.field["values"])
+            self.quickLookupList = [str(ln).lower() for ln in self.field["values"]]
         else:
-            self.quickLookupList = vals
+            self.quickLookupList = [str(ln).lower() for ln in vals]
         self.quick_vals={k:v for k,v in zip(self.quickLookupList,self.field["values"])}
         self.quickLookupList.sort()
         self.field.bind("<KeyRelease>",self.quickFind)
+        self.quickFindFlag = True
 
+    def setQuickFindActive(self,active=None):
+        if active == None:
+            self.quickFindFlag =  not self.quickFindFlag
+        else:
+            self.quickFindFlag = active
 
     def quickFind(self,event):
-        print("Quick Find Called")
+        """Performs the actual lookup for the keypress (or keypress sequence)"""
+        if event.keycode == 27:
+            self.quickFindFlag = not self.quickFindFlag
+        if not self.quickFindFlag:
+            return
         if event.keycode <65 or event.keycode >90:
-            self.quickLetters = ""
+            self.findKey = ""
             self.keyTime = event.time
             return
         if (event.time-self.keyTime)<500:
@@ -802,9 +825,13 @@ class dataComboBox():
         for test in self.quickLookupList:
             print(self.findKey,test)
             if test>=self.findKey:
-                #foundIndex = self.quickLookupList.index(test)
-                #self.field.current(foundIndex)
-                self.quick_vals[test]
+                foundVal = self.quick_vals[test]
+                self.field.set(foundVal)
+#                print(foundVal)
+#                foundIndex = self.quickLookupList.index(test)
+#                print(foundIndex,self.field["values"][foundIndex])
+#                self.field.current(foundIndex)
+#                self.quick_vals[test]
                 break
         self.keyTime = event.time
 
@@ -864,10 +891,9 @@ class dataComboTop():
             self.quickLookupList = vals
         self.quickLookupList.sort()
         self.bindField("<KeyRelease>",self.quickFind)
-        print("Set up quickFind")
+
 
     def quickFind(self,event):
-        print("Running quick find")
         if event.keycode <65 or event.keycode >90:
             self.quickLetters = ""
             self.keyTime = event.time
@@ -1055,6 +1081,7 @@ class dateFieldLeft(dataFieldLeft):
 
         self.field.bind("<MouseWheel>",self.stepDate)
         self.field.bind("<FocusOut>",self.exitDateField)
+        self.field.bind("<Double-Button-1>",self.resetDate)
         
         print(initDate)
         
@@ -1086,6 +1113,8 @@ class dateFieldLeft(dataFieldLeft):
 
         
     def getDateTime(self):
+        """Returns a datetime object corresponding to the date in the
+        control"""
         return self.curDatetime
     
     def setVal(self,newVal):
@@ -1137,8 +1166,6 @@ class dateFieldLeft(dataFieldLeft):
         return self.curDatetime.timestamp()
             
 
-        
-
     def exitDateField(self,event=None):
         """Handler called to validate the control contents when it loses 
         focus."""
@@ -1154,6 +1181,10 @@ class dateFieldLeft(dataFieldLeft):
         self.field.bell()
         self.field.focus_set()
             
+    def resetDate(self,event=None):
+        """Handler associated with a double click in the control; resets the 
+        date to the current date."""
+        self.setDateText(curDate())
 
     def stepDate(self,event=None):
         """Handler called when the scroll wheel is used to increment/decrement
